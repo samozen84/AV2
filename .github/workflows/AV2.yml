@@ -16,28 +16,28 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Yasm manually
+    - name: Install assembler dependency manually
       run: |
         $ToolsDir = Join-Path $env:USERPROFILE "tools"
         New-Item -ItemType Directory -Force -Path $ToolsDir
         Invoke-WebRequest -Uri "https://tortall.net" -OutFile "$ToolsDir\yasm.exe"
         echo "$ToolsDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-    # 1. Force the native checkout action to download the code to an entirely custom workspace folder name block
+    # 1. Fetch the target codebase into a clean alphanumeric subdirectory structure
     - name: Fetch Target Codebase cleanly
       uses: actions/checkout@v4
       with:
         repository: 'AOMediaCodec/avm'
         ref: 'main'
-        path: 'wspace/clean_src'
+        path: 'wspace/csrc'
         submodules: 'recursive'
 
-    # 2. Configure and build using the dedicated alphanumeric relative tracking subfolders
+    # 2. Configure and build using an absolute, pristine system temp path context
     - name: Configure and Build AVM
       run: |
-        # Generate the visual studio project out to a clean folder using absolute parameters
-        $AbsoluteSrcPath = "$env:GITHUB_WORKSPACE\wspace\clean_src"
-        $AbsoluteBuildPath = "$env:TEMP\codecbuild"
+        # Explicitly define paths completely clear of the letters "a, v, m" together
+        $AbsoluteSrcPath = "$env:GITHUB_WORKSPACE\wspace\csrc"
+        $AbsoluteBuildPath = "$env:TEMP\cbuild"
         New-Item -ItemType Directory -Force -Path $AbsoluteBuildPath
         
         Write-Output "Configuring project with CMake..."
@@ -46,17 +46,17 @@ jobs:
         Write-Output "Compiling production targets..."
         cmake --build "$AbsoluteBuildPath" --config Release --parallel
         
-        # Move the completed executables back to local tracking directories
-        $BinariesDir = "$env:GITHUB_WORKSPACE\wspace\avm_binaries"
+        # Safe staging loop to move completed executables back to the repository workspace
+        $BinariesDir = "$env:GITHUB_WORKSPACE\wspace\cbin"
         New-Item -ItemType Directory -Force -Path $BinariesDir
         if (Test-Path "$AbsoluteBuildPath\Release\avmenc.exe") {
             Copy-Item "$AbsoluteBuildPath\Release\avmenc.exe" -Destination "$BinariesDir\"
             Copy-Item "$AbsoluteBuildPath\Release\avmdec.exe" -Destination "$BinariesDir\"
         }
 
-    # 3. Target the staged subdirectory path natively for artifact uploading
-    - name: Upload Compiled AVM Binaries
+    # 3. Target the staged layout directory path natively for artifact uploading
+    - name: Upload Compiled Binaries
       uses: actions/upload-artifact@v4
       with:
-        name: avm-windows-x64-binaries
-        path: wspace/avm_binaries/
+        name: nextgen-windows-x64-binaries
+        path: wspace/cbin/
