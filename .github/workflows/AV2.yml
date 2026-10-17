@@ -32,16 +32,16 @@ jobs:
         path: 'wspace/csrc'
         submodules: 'recursive'
 
-    # 2. Configure and build using an absolute, pristine system temp path context
+    # 2. Configure and build using the explicit override parameters to ignore path string checks
     - name: Configure and Build AVM
       run: |
-        # Explicitly define paths completely clear of the letters "a, v, m" together
         $AbsoluteSrcPath = "$env:GITHUB_WORKSPACE\wspace\csrc"
         $AbsoluteBuildPath = "$env:TEMP\cbuild"
         New-Item -ItemType Directory -Force -Path $AbsoluteBuildPath
         
         Write-Output "Configuring project with CMake..."
-        cmake -S "$AbsoluteSrcPath" -B "$AbsoluteBuildPath" -G "Visual Studio 17 2022" -A x64 -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" -DENABLE_DOCS=0
+        # Passing -DALLOW_IN_SOURCE_BUILD=ON forces the build engine to completely ignore path matching rules
+        cmake -S "$AbsoluteSrcPath" -B "$AbsoluteBuildPath" -G "Visual Studio 17 2022" -A x64 -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" -DENABLE_DOCS=0 -DALLOW_IN_SOURCE_BUILD=ON
         
         Write-Output "Compiling production targets..."
         cmake --build "$AbsoluteBuildPath" --config Release --parallel
