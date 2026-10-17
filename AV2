@@ -1,0 +1,62 @@
+name: AVM Codec Windows Build CI
+
+on:
+  push:
+    branches: [ main, av2-enc ]
+  pull_request:
+    branches: [ main, av2-enc ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Yasm manually
+      run: |
+        $ToolsDir = Join-Path $env:USERPROFILE "tools"
+        New-Item -ItemType Directory -Force -Path $ToolsDir
+        Invoke-WebRequest -Uri "https://tortall.net" -OutFile "$ToolsDir\yasm.exe"
+        echo "$ToolsDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    # 1. Force the native checkout action to download the code to an entirely custom workspace folder name block
+    - name: Fetch Target Codebase cleanly
+      uses: actions/checkout@v4
+      with:
+        repository: 'AOMediaCodec/avm'
+        ref: 'main'
+        path: 'wspace/clean_src'
+        submodules: 'recursive'
+
+    # 2. Configure and build using the dedicated alphanumeric relative tracking subfolders
+    - name: Configure and Build AVM
+      run: |
+        # Generate the visual studio project out to a clean folder using absolute parameters
+        $AbsoluteSrcPath = "$env:GITHUB_WORKSPACE\wspace\clean_src"
+        $AbsoluteBuildPath = "$env:TEMP\codecbuild"
+        New-Item -ItemType Directory -Force -Path $AbsoluteBuildPath
+        
+        Write-Output "Configuring project with CMake..."
+        cmake -S "$AbsoluteSrcPath" -B "$AbsoluteBuildPath" -G "Visual Studio 17 2022" -A x64 -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" -DENABLE_DOCS=0
+        
+        Write-Output "Compiling production targets..."
+        cmake --build "$AbsoluteBuildPath" --config Release --parallel
+        
+        # Move the completed executables back to local tracking directories
+        $BinariesDir = "$env:GITHUB_WORKSPACE\wspace\avm_binaries"
+        New-Item -ItemType Directory -Force -Path $BinariesDir
+        if (Test-Path "$AbsoluteBuildPath\Release\avmenc.exe") {
+            Copy-Item "$AbsoluteBuildPath\Release\avmenc.exe" -Destination "$BinariesDir\"
+            Copy-Item "$AbsoluteBuildPath\Release\avmdec.exe" -Destination "$BinariesDir\"
+        }
+
+    # 3. Target the staged subdirectory path natively for artifact uploading
+    - name: Upload Compiled AVM Binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: avm-windows-x64-binaries
+        path: wspace/avm_binaries/
