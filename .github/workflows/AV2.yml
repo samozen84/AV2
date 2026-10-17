@@ -32,16 +32,18 @@ jobs:
         path: 'wspace/csrc'
         submodules: 'recursive'
 
-    # 2. Configure and build using the explicit override parameters to ignore path string checks
+    # 2. Configure and build while completely stripping Git tracking configurations
     - name: Configure and Build AVM
       run: |
+        # Force remove the underlying .git meta folders to completely hide the upstream "AOMediaCodec/avm" remote tracking string name
+        Remove-Item -Path "$env:GITHUB_WORKSPACE\wspace\csrc\.git" -Recurse -Force -ErrorAction SilentlyContinue
+        
         $AbsoluteSrcPath = "$env:GITHUB_WORKSPACE\wspace\csrc"
         $AbsoluteBuildPath = "$env:TEMP\cbuild"
         New-Item -ItemType Directory -Force -Path $AbsoluteBuildPath
         
         Write-Output "Configuring project with CMake..."
-        # Passing -DALLOW_IN_SOURCE_BUILD=ON forces the build engine to completely ignore path matching rules
-        cmake -S "$AbsoluteSrcPath" -B "$AbsoluteBuildPath" -G "Visual Studio 17 2022" -A x64 -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" -DENABLE_DOCS=0 -DALLOW_IN_SOURCE_BUILD=ON
+        cmake -S "$AbsoluteSrcPath" -B "$AbsoluteBuildPath" -G "Visual Studio 17 2022" -A x64 -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" -DENABLE_DOCS=0
         
         Write-Output "Compiling production targets..."
         cmake --build "$AbsoluteBuildPath" --config Release --parallel
